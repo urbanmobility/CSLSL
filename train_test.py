@@ -184,7 +184,7 @@ def evaluate(model, data, data_id, params):
         # calculate metrics
         l_acc = calculate_recall(target_batch[0], l_pred)
         l_acc_all += l_acc
-        t_mse_all += torch.nn.functional.l1_loss(th_pred.squeeze(-1), target_batch[1], reduction='sum').item()
+        t_mse_all += torch.nn.functional.l1_loss(th_pred.squeeze(-1), target_batch[1].squeeze(-1), reduction='sum').item()
         valid_num_all += valid_num
         
         if params.cat_contained:
