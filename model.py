@@ -82,17 +82,17 @@ class Model(nn.Module):
         # Version: seperate
         cur_t_rnn, hc_t = self.capturer_t(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:])
         if self.cat_contained:
-            cur_c_rnn, hc_l = self.capturer_c(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t) 
-            cur_l_rnn, _ = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_l)   
+            cur_c_rnn, hc_c = self.capturer_c(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t) 
+            cur_l_rnn, hc_l = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_c)   
             
             # 4) tower, t,c,l
             # CMTL
-            t_pred = self.fc_t(cur_t_rnn) 
+            hc_t, hc_c, hc_l = hc_t.squeeze(), hc_c.squeeze(), hc_l.squeeze()
+            t_pred = self.fc_t(hc_t) 
             t_trans = self.label_trans_t(t_pred.clone())
-            c_pred = self.fc_c(torch.cat((cur_c_rnn, t_trans), dim=-1)) 
+            c_pred = self.fc_c(torch.cat((hc_c, t_trans), dim=-1)) 
             c_trans = self.label_trans_c(c_pred.clone())
-            l_pred = self.fc_l(torch.cat((cur_l_rnn, c_trans), dim=-1)) 
-            c_pred = c_pred.masked_fill_(target_mask, 0)
+            l_pred = self.fc_l(torch.cat((hc_l, c_trans), dim=-1)) 
         else:
             cur_l_rnn, _ = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t)   
             # 4) tower, t,c,l
@@ -100,18 +100,13 @@ class Model(nn.Module):
             t_pred = self.fc_t(cur_t_rnn) 
             t_trans = self.label_trans_t(t_pred.clone())
             l_pred = self.fc_l(torch.cat((cur_l_rnn, t_trans), dim=-1)) 
-        
-
-        # 5) mask (After linear, bias contained)
-        th_pred = t_pred.masked_fill_(target_mask, 0)
-        l_pred = l_pred.masked_fill_(target_mask, 0)
-        
+       
         valid_num = (target_mask==0).sum().item()
         
         if self.cat_contained:
-            return th_pred, c_pred, l_pred, valid_num
+            return t_pred, c_pred, l_pred, valid_num
         else:
-            return th_pred, 0, l_pred, valid_num
+            return t_pred, 0, l_pred, valid_num
         
     def calculate_loss(self, th_pred_in, c_pred_in, l_pred_in, target_batch, valid_num, pid_lat_lon_radians):
         
@@ -120,7 +115,7 @@ class Model(nn.Module):
         l_target = target_batch[0].reshape(-1)
         loss_l = self.cross_entropy_loss(l_pred, l_target) / valid_num
         # time loss with mse loss
-        th_target = target_batch[1]
+        th_target = target_batch[1].reshape(-1)
         loss_t = self.mse_loss(th_pred_in.squeeze(-1), th_target.float()) / valid_num
         
         loss_geocons = self.geo_con_loss(l_pred, l_target, pid_lat_lon_radians) / valid_num

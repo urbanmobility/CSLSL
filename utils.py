@@ -12,7 +12,8 @@ def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
     uid_list = data_id.keys()
     for uid in uid_list:
         for sid in data_id[uid]:
-            data_queue.append((uid, sid))
+            for tar_idx in range(len(data_input[uid][sid]['target_l'])):
+                data_queue.append((uid, sid, tar_idx))
             
     # generate batch data
     data_len = len(data_queue)
@@ -44,11 +45,12 @@ def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
         batch_idx_list = np.random.choice(data_len, batch_size, replace=False)
         # iterate batch index
         for batch_idx in batch_idx_list:
-            uid, sid = data_queue[batch_idx]
+            uid, sid, tar_idx = data_queue[batch_idx]
             uid_batch.append([uid])
             # current
-            loc_cur_batch.append(torch.LongTensor(data_input[uid][sid]['loc'][1]))  
-            tim_cur_ts = torch.LongTensor(data_input[uid][sid]['tim'][1])
+            in_idx = tar_idx + 1
+            loc_cur_batch.append(torch.LongTensor(data_input[uid][sid]['loc'][1][:in_idx]))  
+            tim_cur_ts = torch.LongTensor(data_input[uid][sid]['tim'][1][:in_idx])
             tim_w_cur_batch.append(tim_cur_ts[:, 0])      
             tim_h_cur_batch.append(tim_cur_ts[:, 1]) 
             current_len_batch.append(tim_cur_ts.shape[0])
@@ -59,15 +61,15 @@ def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
             tim_h_his_batch.append(tim_his_ts[:, 1])   
             history_len_batch.append(tim_his_ts.shape[0])
             # target 
-            target_l = torch.LongTensor(data_input[uid][sid]['target_l']) 
+            target_l = torch.LongTensor([data_input[uid][sid]['target_l'][tar_idx]]) 
             target_l_batch.append(target_l) 
             target_len_batch.append(target_l.shape[0])
-            target_th_batch.append(torch.LongTensor(data_input[uid][sid]['target_th']))   
+            target_th_batch.append(torch.LongTensor([data_input[uid][sid]['target_th'][tar_idx]]))   
             # catrgory
             if cat_contained:
                 cat_his_batch.append(torch.LongTensor(data_input[uid][sid]['cat'][0])) 
-                cat_cur_batch.append(torch.LongTensor(data_input[uid][sid]['cat'][1])) 
-                target_c_batch.append(torch.LongTensor(data_input[uid][sid]['target_c'])) 
+                cat_cur_batch.append(torch.LongTensor(data_input[uid][sid]['cat'][1][:in_idx])) 
+                target_c_batch.append(torch.LongTensor([data_input[uid][sid]['target_c'][tar_idx]])) 
             
                 
                   
@@ -158,3 +160,45 @@ def get_model_params(model):
     print(f'==== Parameter numbers:\n total={total_num}, trainable={trainable_num}')
     
     
+    
+class progress_supervisor(object):
+    def __init__(self, all_num, path):
+        self.cur_num = 1
+        self.start_time = time.time()
+        self.all_num = all_num
+        self.path = path
+        
+        with open(self.path, 'w') as f:
+            f.write('Start')
+        
+    def update(self):
+        '''Usage:
+            count_time = count_run_time(5 * 4 * 4)
+            count_time.path = f'{args.out_dir}{args.model_name}_{args.data_name}.txt'
+            main()
+            count_time.current_count()
+        '''
+
+        past_time = time.time()-self.start_time
+        avg_time = past_time / self.cur_num
+        fut_time = avg_time * (self.all_num - self.cur_num)
+
+        content = '=' * 10 + ' Progress observation'
+        content += f'Current time is {time.strftime("%Y-%m-%d %H:%M:%S")}\n'
+        content += f'Current Num: {self.cur_num} / {self.all_num}\n'
+        content += f'Past time: {past_time:.2f}s ({past_time/3600:.2f}h)\n'
+        content += f'Average time: {avg_time:.2f}s ({avg_time/3600:.2f}h)\n'
+        content += f'Future time: {fut_time:.2f}s ({fut_time/3600:.2f}h)\n'
+
+        with open(self.path, 'w') as f:
+            f.write(content) 
+            
+        self.cur_num += 1
+        return content
+    
+    def delete(self):
+        if os.path.exists(self.path):
+            os.remove(self.path)
+            
+        if not os.path.exists(self.path):
+            print('Supervisor file delete success')
