@@ -94,12 +94,13 @@ class Model(nn.Module):
             c_trans = self.label_trans_c(c_pred.clone())
             l_pred = self.fc_l(torch.cat((hc_l, c_trans), dim=-1)) 
         else:
-            cur_l_rnn, _ = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t)   
+            cur_l_rnn, hc_l = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t)   
             # 4) tower, t,c,l
             # CMTL
-            t_pred = self.fc_t(cur_t_rnn) 
+            hc_t, hc_l = hc_t.squeeze(), hc_l.squeeze()
+            t_pred = self.fc_t(hc_t) 
             t_trans = self.label_trans_t(t_pred.clone())
-            l_pred = self.fc_l(torch.cat((cur_l_rnn, t_trans), dim=-1)) 
+            l_pred = self.fc_l(torch.cat((hc_l, t_trans), dim=-1)) 
        
         valid_num = (target_mask==0).sum().item()
         
