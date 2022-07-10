@@ -50,7 +50,7 @@ class Model(nn.Module):
         
         # Loss
         self.cross_entropy_loss = nn.CrossEntropyLoss(reduction='sum', ignore_index=0)
-        self.mse_loss = nn.L1Loss(reduction='sum')
+        self.mae_loss = nn.L1Loss(reduction='sum')
                
     def forward(self, data, mask_batch):
         
@@ -115,9 +115,9 @@ class Model(nn.Module):
         l_pred = l_pred_in.reshape(-1, self.pid_size)
         l_target = target_batch[0].reshape(-1)
         loss_l = self.cross_entropy_loss(l_pred, l_target) / valid_num
-        # time loss with mse loss
+        # time loss with mae loss
         th_target = target_batch[1].reshape(-1)
-        loss_t = self.mse_loss(th_pred_in.squeeze(-1), th_target.float()) / valid_num
+        loss_t = self.mae_loss(th_pred_in.squeeze(-1), th_target.float()) / valid_num
         
         loss_geocons = self.geo_con_loss(l_pred, l_target, pid_lat_lon_radians) / valid_num
         
