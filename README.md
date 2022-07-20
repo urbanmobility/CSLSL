@@ -1,7 +1,5 @@
 # CSLSL
-PyTorch implementation of the paper-"Human Mobility Prediction with Causal and Spatial-constrained Multi-task Network", accepted by KDD 2022.
 
-We are glad about your interest in our work and we would appreciate it if you cite our paper.
 
 # Datasets
 - The processed data can be found in the "data" folder, which was processed by ```data_preproess.py``` and ```data_prepare.py```.
