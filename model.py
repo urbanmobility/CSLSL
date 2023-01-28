@@ -39,13 +39,15 @@ class Model(nn.Module):
             self.capturer_c = SessionCapturer(RNN_input_dim, self.rnn_c_hid_dim, params)
         
         # CMTL
-        self.fc_t = nn.Linear(self.rnn_t_hid_dim, 1)
-        self.label_trans_t = nn.Linear(1, self.tim_h_embed_dim)
         if self.cat_contained:
-            self.fc_c = nn.Linear(self.rnn_c_hid_dim + self.tim_h_embed_dim, self.cid_size)
+            self.fc_c = nn.Linear(self.rnn_c_hid_dim, self.cid_size)
             self.label_trans_c = nn.Linear(self.cid_size, self.cat_embed_dim)
-            self.fc_l = nn.Linear(self.rnn_l_hid_dim + self.cat_embed_dim, self.pid_size)
+            self.fc_t = nn.Linear(self.rnn_t_hid_dim + self.cat_embed_dim, 1)
+            self.label_trans_t = nn.Linear(1, self.tim_h_embed_dim)
+            self.fc_l = nn.Linear(self.rnn_l_hid_dim + self.tim_h_embed_dim, self.pid_size)
         else:
+            self.fc_t = nn.Linear(self.rnn_t_hid_dim, 1)
+            self.label_trans_t = nn.Linear(1, self.tim_h_embed_dim)
             self.fc_l = nn.Linear(self.rnn_l_hid_dim + self.tim_h_embed_dim, self.pid_size)
         
         # Loss
@@ -88,11 +90,12 @@ class Model(nn.Module):
             # 4) tower, t,c,l
             # CMTL
             hc_t, hc_c, hc_l = hc_t.squeeze(), hc_c.squeeze(), hc_l.squeeze()
-            t_pred = self.fc_t(hc_t) 
-            t_trans = self.label_trans_t(t_pred.clone())
-            c_pred = self.fc_c(torch.cat((hc_c, t_trans), dim=-1)) 
+            
+            c_pred = self.fc_c(hc_c) 
             c_trans = self.label_trans_c(c_pred.clone())
-            l_pred = self.fc_l(torch.cat((hc_l, c_trans), dim=-1)) 
+            t_pred = self.fc_t(torch.cat((hc_t, c_trans), dim=-1)) 
+            t_trans = self.label_trans_t(t_pred.clone())
+            l_pred = self.fc_l(torch.cat((hc_l, t_trans), dim=-1)) 
         else:
             cur_l_rnn, hc_l = self.capturer_l(rnn_input_his_concat, rnn_input_cur_concat, his_mask, cur_mask, mask_batch[1:], hc_t)   
             # 4) tower, t,c,l
@@ -131,19 +134,25 @@ class Model(nn.Module):
         else:
             return loss_t, torch.tensor(0), loss_l, loss_geocons
         
-    def geo_con_loss(self, l_pred_in, l_target, pid_lat_lon_radians):
+    def geo_con_loss(self, l_pred_in, l_target, pid_lat_lon):
         
         log_softmax = nn.functional.log_softmax(l_pred_in, dim=-1)
         l_pred = torch.argmax(log_softmax, dim=-1)
-        l_coor_pred = pid_lat_lon_radians[l_pred]
-        l_coor_tar = pid_lat_lon_radians[l_target]
+        l_coor_pred = pid_lat_lon[l_pred]
+        l_coor_tar = pid_lat_lon[l_target]
 
         dlat = l_coor_pred[:, 0] - l_coor_tar[:, 0]
         dlon = l_coor_pred[:, 1] - l_coor_tar[:, 1]
-        a = torch.sin(dlat/2) **2 + torch.cos(l_coor_pred[:, 0]) * torch.cos(l_coor_tar[:, 0]) * (torch.sin(dlon/2))**2
-        km = EARTHRADIUS * 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1-a))
+#         a = torch.sin(dlat/2) **2 + torch.cos(l_coor_pred[:, 0]) * torch.cos(l_coor_tar[:, 0]) * (torch.sin(dlon/2))**2
+#         dist = EARTHRADIUS * 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1-a))
+        # new version
+        dist = dlat ** 2 + dlon ** 2
+        loc_prob = log_softmax * dist.unsqueeze(-1)
+        loss_geocons = F.nll_loss(loc_prob, l_target, ignore_index=0, reduction='sum')
+        
+        return loss_geocons
+        
 
-        return km.sum()
     
 class SessionCapturer(nn.Module):
     '''Expert module'''

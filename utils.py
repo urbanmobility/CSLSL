@@ -3,6 +3,7 @@ import time
 import numpy as np
 import torch
 from torch.nn.utils.rnn import pad_sequence
+import random
 
 def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
     '''generate batch data'''
@@ -18,6 +19,7 @@ def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
     # generate batch data
     data_len = len(data_queue)
     batch_num = int(data_len/batch_size)
+    random.shuffle(data_queue) 
     print(f'Number of batch is {batch_num}')
     # iterate batch number times
     for i in range(batch_num):
@@ -42,10 +44,10 @@ def generate_batch_data(data_input, data_id, device, batch_size, cat_contained):
         if i % 100 == 0:
             print('====', f'[Batch={i}/{batch_num}]', end=', ')
 
-        batch_idx_list = np.random.choice(data_len, batch_size, replace=False)
+        batch_data = data_queue[i * batch_size : (i+1) * batch_size]
         # iterate batch index
-        for batch_idx in batch_idx_list:
-            uid, sid, tar_idx = data_queue[batch_idx]
+        for one_data in batch_data:
+            uid, sid, tar_idx = one_data
             uid_batch.append([uid])
             # current
             in_idx = tar_idx + 1

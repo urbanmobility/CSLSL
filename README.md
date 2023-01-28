@@ -28,14 +28,14 @@
 
 
 # Usage
-1. Evaluate a pretrained model
-> ```python
-> python evaluate.py --data_name NYC --model_name model_NYC
-> ```
-
-2. Train and test a new model
+1. Train and test a new model
 > ```python
 > python train_test.py --data_name NYC 
+> ```
+
+2. Evaluate a pretrained model
+> ```python
+> python evaluate.py --data_name NYC --model_name model_NYC
 > ```
 
 Detailed parameter description refers to ```evaluate.py``` and ```train_test.py```

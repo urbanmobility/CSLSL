@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from utils import *
 from model import *
@@ -21,15 +22,15 @@ def settings(param=[]):
     parser.add_argument('--out_filename', type=str, default='', help="output data filename")
     # train params
     parser.add_argument('--gpu', type=str, default='0', help="GPU index to choose")
-    parser.add_argument('--run_num', type=int, default=10, help="run number")
-    parser.add_argument('--epoch_num', type=int, default=30, help="epoch number")
+    parser.add_argument('--run_num', type=int, default=1, help="run number")
+    parser.add_argument('--epoch_num', type=int, default=10, help="epoch number")
     parser.add_argument('--batch_size', type=int, default=128, help="batch size")
     parser.add_argument('--learning_rate', type=float, default=1e-4, help="learning rate")
     parser.add_argument('--weight_decay', type=float, default=1e-6, help="weight decay")
-    parser.add_argument('--evaluate_step', type=int, default=2, help="evaluate step")
-    parser.add_argument('--lam_t', type=float, default=1, help="loss lambda time")
-    parser.add_argument('--lam_c', type=float, default=1, help="loss lambda category")
-    parser.add_argument('--lam_s', type=float, default=1, help="loss lambda for geographcal consistency")
+    parser.add_argument('--evaluate_step', type=int, default=1, help="evaluate step")
+    parser.add_argument('--lam_t', type=float, default=5, help="loss lambda time")
+    parser.add_argument('--lam_c', type=float, default=10, help="loss lambda category")
+    parser.add_argument('--lam_s', type=float, default=10, help="loss lambda for geographcal consistency")
     # model params
     # embedding
     parser.add_argument('--user_embed_dim', type=int, default=20, help="user embedding dimension")
@@ -66,7 +67,7 @@ def train(params, dataset):
     # generate input data
     data_train, train_id = dataset['train_data'], dataset['train_id']
     data_test, test_id = dataset['test_data'], dataset['test_id']
-    pid_lat_lon_radians = torch.tensor([[0, 0]] + list(dataset['pid_lat_lon_radians'].values())).to(params.device)
+    pid_lat_lon = torch.tensor([[0, 0]] + list(dataset['pid_lat_lon'].values())).to(params.device)
     
     # model and optimizer
     model = Model(params).to(params.device)
@@ -96,7 +97,7 @@ def train(params, dataset):
             # model forward
             th_pred, c_pred, l_pred, valid_num = model(data_batch, mask_batch)
             # calcuate loss
-            loss_t, loss_c, loss_l, loss_s = model.calculate_loss(th_pred, c_pred, l_pred, target_batch, valid_num, pid_lat_lon_radians)
+            loss_t, loss_c, loss_l, loss_s = model.calculate_loss(th_pred, c_pred, l_pred, target_batch, valid_num, pid_lat_lon)
             loss = loss_l + params.lam_t * loss_t + params.lam_c * loss_c + params.lam_s * loss_s  
             valid_all += valid_num 
             loss_l_all += loss_l.item() * valid_num
@@ -157,6 +158,7 @@ def train(params, dataset):
            
     # evaluation
     print('='*10, ' Testing')
+    model.load_state_dict(best_info_test['model_params'])
     results_l, results_c, results_t = evaluate(model, data_test, test_id, params)
     print(f'Test results: loc={results_l}, cat={results_c}, tim={results_t:.2f}')
     
@@ -202,9 +204,10 @@ if __name__ == '__main__':
     print('Parameter is\n', params.__dict__)
     
     # file name to store
-    FILE_NAME = [params.path_out, f'{time.strftime("%Y%m%d")}_{params.data_name}_']
-    FILE_NAME[1] += f'{params.out_filename}'
-    
+    params.file_out = f'{params.path_out}/{time.strftime("%Y%m%d")}_{params.data_name}_{params.out_filename}/'
+    if not os.path.exists(params.file_out):
+        os.makedirs(params.file_out)
+        
     # Load data
     print('='*20, ' Loading data')
     start_time = time.time()
@@ -220,6 +223,7 @@ if __name__ == '__main__':
     
     # start running
     print('='*20, "Start Training")
+    print(time.strftime("%Y%m%d-%H:%M:%S"))
     for i in range(params.run_num):
         print('='*20, f'Run {i}')
         
@@ -243,9 +247,10 @@ if __name__ == '__main__':
     std.index = ['std']
     metrics = pd.concat([metrics, mean, std])
     print(metrics)
-    
+
     # save
-    metrics.to_csv(f'{FILE_NAME[0]}metrics_{FILE_NAME[1]}.csv')
-    print('='*20, f'\nMetrics saved. File name is {FILE_NAME[0]}metrics_{FILE_NAME[1]}.csv')
-    torch.save(best_info_all_run["model_params"], f'{FILE_NAME[0]}model_{FILE_NAME[1]}.pkl')
+    metrics.to_csv(f'{params.file_out}metrics.csv')
+    print('='*20, f'\nMetrics saved.')
+    torch.save(best_info_all_run["model_params"], f'{params.file_out}model.pkl')
     print(f'Model saved (Run={best_info_all_run["run"]}, Epoch={best_info_all_run["epoch"]})')
+    print(time.strftime("%Y%m%d-%H:%M:%S"))
