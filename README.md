@@ -1,6 +1,55 @@
 # CSLSL
 
 
+# Performances
+The latest experimental results are as follows:
+
+<table>
+    <tr>
+        <th> </th>
+        <th colspan=3> Category </th>
+        <th colspan=3> Location </th>
+    </tr>
+    <tr>
+        <td></td>
+        <td> R@1 </td>
+        <td> R@5 </td>
+        <td> R@10 </td>
+        <td> R@1 </td>
+        <td> R@5 </td>
+        <td> R@10 </td>
+    </tr>
+    <tr>
+        <td> NYC </td>
+        <td> 0.327 </td>
+        <td> 0.661 </td>
+        <td> 0.759 </td>
+        <td> 0.268 </td>
+        <td> 0.568 </td>
+        <td> 0.656 </td>
+    </tr>
+    <tr>
+        <td> TKY </td>
+        <td> 0.448 </td>
+        <td> 0.801 </td>
+        <td> 0.875 </td>
+        <td> 0.240 </td>
+        <td> 0.488 </td>
+        <td> 0.580 </td>
+    </tr>
+    <tr>
+        <td> Dallas </td>
+        <td> - </td>
+        <td> - </td>
+        <td> - </td>
+        <td> 0.126 </td>
+        <td> 0.243 </td>
+        <td> 0.297 </td>
+    </tr>
+</table>
+
+
+
 # Datasets
 - The processed data can be found in the "data" folder, which was processed by ```data_preproess.py``` and ```data_prepare.py```.
 - The raw data can be found at the following open source.
